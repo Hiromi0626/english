@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英語音読・リスニング学習</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .highlight { background-color: #fef08a; transition: background-color 0.2s; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-2xl w-full bg-white rounded-3xl shadow-xl p-6 md:p-10">
+        <header class="mb-8 flex items-center gap-3">
+            <div class="bg-indigo-600 p-2 rounded-lg text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-800">English Speaker</h1>
+        </header>
+
+        <!-- Text Input Section -->
+        <div class="mb-6">
+            <label class="block text-sm font-semibold text-slate-600 mb-2">英文を入力してください：</label>
+            <textarea id="text-input" rows="8" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition text-slate-700 leading-relaxed" placeholder="Paste your English text here..."></textarea>
+        </div>
+
+        <!-- Controls Section -->
+        <div class="bg-indigo-50 p-6 rounded-2xl mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                
+                <!-- Speed Control -->
+                <div>
+                    <div class="flex justify-between mb-2">
+                        <label class="text-sm font-bold text-indigo-900">再生速度</label>
+                        <span id="speed-value" class="text-sm font-mono text-indigo-700">1.0x</span>
+                    </div>
+                    <input type="range" id="speed-range" min="0.5" max="2.0" step="0.1" value="1.0" class="w-full h-2 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+                    <div class="flex justify-between text-xs text-indigo-400 mt-1 font-mono">
+                        <span>0.5x</span>
+                        <span>1.0x</span>
+                        <span>2.0x</span>
+                    </div>
+                </div>
+
+                <!-- Voice Selection (Auto-filtered to US English) -->
+                <div>
+                    <label class="block text-sm font-bold text-indigo-900 mb-2">音声の種類</label>
+                    <select id="voice-select" class="w-full p-2 bg-white border border-indigo-200 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="">ロード中...</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-4">
+            <button id="play-btn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                再生
+            </button>
+            <button id="stop-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-4 px-8 rounded-2xl transition flex items-center justify-center gap-2 active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></svg>
+                停止
+            </button>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-slate-100 text-center">
+            <p class="text-xs text-slate-400 italic">
+                Tips: 0.8倍速に下げるとシャドーイングの練習に最適です。
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const synth = window.speechSynthesis;
+        const textInput = document.getElementById('text-input');
+        const playBtn = document.getElementById('play-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const speedRange = document.getElementById('speed-range');
+        const speedValue = document.getElementById('speed-value');
+        const voiceSelect = document.getElementById('voice-select');
+
+        let voices = [];
+
+        // Load voices and filter for US English
+        function loadVoices() {
+            voices = synth.getVoices();
+            const usVoices = voices.filter(voice => voice.lang.includes('en-US'));
+            
+            voiceSelect.innerHTML = usVoices.length > 0 
+                ? usVoices.map((v, i) => `<option value="${v.name}">${v.name}</option>`).join('')
+                : '<option value="">標準の英語音声</option>';
+        }
+
+        // Wait for voices to be loaded (Chrome workaround)
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
+        loadVoices();
+
+        // Update speed label
+        speedRange.addEventListener('input', () => {
+            speedValue.textContent = `${speedRange.value}x`;
+        });
+
+        // Play functionality
+        playBtn.addEventListener('click', () => {
+            if (synth.speaking) {
+                synth.cancel(); // If already speaking, restart
+            }
+
+            const text = textInput.value.trim();
+            if (!text) {
+                alert("英文を貼り付けてください。");
+                return;
+            }
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // Set Selected Voice
+            const selectedVoiceName = voiceSelect.value;
+            const selectedVoice = voices.find(v => v.name === selectedVoiceName);
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            } else {
+                utterance.lang = 'en-US';
+            }
+
+            // Set Rate
+            utterance.rate = parseFloat(speedRange.value);
+            
+            // Feedback
+            playBtn.classList.add('ring-4', 'ring-indigo-200');
+            utterance.onend = () => {
+                playBtn.classList.remove('ring-4', 'ring-indigo-200');
+            };
+
+            synth.speak(utterance);
+        });
+
+        // Stop functionality
+        stopBtn.addEventListener('click', () => {
+            synth.cancel();
+            playBtn.classList.remove('ring-4', 'ring-indigo-200');
+        });
+
+    </script>
+</body>
+</html>
